@@ -1,56 +1,43 @@
-import requests
-import requests.exceptions
-from bs4 import BeautifulSoup
+from __future__ import division
 
-timeout = 5
+import csv
+import time
+import datetime
 
-payload = {'Type': 'ThreeHourly', 'PredictionSiteId': '310009', 'Date': '15/01/2015', 'PredictionTime': '0000'}
+import met
+import database
 
-urlResponse = None
+grabber = met.Grabber()
+db = database.MetDatabase.create('glasgow.db')
 
-while True:
-  try:
-    urlResponse = requests.post('http://datagovuk.cloudapp.net/query', data=payload, timeout=timeout)
+site = 3134
+filename = 'glasgow.csv'
+
+dates = grabber.getDateList(range(31, 0, -1))
+times = grabber.getTimeList(range(0, 24))
+
+for thisDate in dates:
+  for thisTime in times:
+    print "Getting {0} {1}".format(thisDate, thisTime)
     
-    break
-  except requests.exceptions.Timeout:
-    print "Connect timeout. Trying again..."
-  except requests.exceptions.ConnectionError as e:
-    print "Connect error. Failing..."
-    
-    raise e
-
-soup = BeautifulSoup(urlResponse.text)
-
-downloadUrl = None
-
-for thisLink in soup.find_all('a'):
-  thisUrl = thisLink.get('href')
-  
-  if thisUrl[-3:] == 'csv':
-    # found CSV download link
-    downloadUrl = thisUrl
-    
-    break
-
-csvResponse = None
-
-with open('file.csv', 'wb') as handle:
-  while True:
     try:
-      csvResponse = requests.get(downloadUrl, stream=True)
+      grabber.grab(filename=filename, site=site, date=thisDate, time=thisTime)
+    except met.NoRecordException:
+      print "No records found for {0} {1}. Skipping.".format(thisDate, thisTime)
       
-      break
-    except requests.exceptions.ConnectTimeout:
-      print "Connect timeout. Trying again..."
+      continue
 
-  if not csvResponse.ok:
-    print "Something went wrong"
-
-  for block in csvResponse.iter_content(1024):
-    if not block:
-      break
-
-    handle.write(block)
-
-print "Done"
+    with open(filename, 'rb') as csvFile:
+      reader = csv.reader(csvFile, delimiter=',')
+      
+      # skip header
+      next(reader)
+      
+      for row in reader:
+	timestamp = time.mktime(datetime.datetime.strptime('{0} {1}'.format(row[6], row[5]), '%Y-%m-%d %H:%M').timetuple())
+	
+	# gust should be non-zero
+	if row[9] == '':
+	  row[9] = 0
+	
+	db.insert({'timestamp': timestamp, 'windDirection': row[7], 'windSpeed': row[8], 'windGust': row[9], 'visibility': row[10], 'screenTemperature': row[11], 'pressure': row[12]})
