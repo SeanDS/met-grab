@@ -15,7 +15,7 @@ db = database.MetDatabase('glasgow.db')
 site = 3134
 filename = 'glasgow.csv'
 
-dates = grabber.getDateList(range(310, 0, -1))
+dates = grabber.getDateList(range(215, 0, -1))
 times = grabber.getTimeList(range(0, 24))
 
 skipped = []
@@ -56,7 +56,12 @@ for thisDate in dates:
 	if row[9] == '':
 	  row[9] = 0
 	
-	db.insert({'timestamp': timestamp, 'windDirection': row[7], 'windSpeed': row[8], 'windGust': row[9], 'visibility': row[10], 'screenTemperature': row[11], 'pressure': row[12]})
+	try:
+	  db.insert({'timestamp': timestamp, 'windDirection': row[7], 'windSpeed': row[8], 'windGust': row[9], 'visibility': row[10], 'screenTemperature': row[11], 'pressure': row[12]})
+	except Exception, e:
+	  print e
+	  
+	  continue
 
 if len(skipped) > 0:
   print "\nSkipped:"

@@ -48,7 +48,10 @@ class MetDatabase(object):
     
     cursor = self.db.cursor()
     
-    cursor.execute('INSERT INTO met VALUES (:timestamp, :windDirection, :windSpeed, :windGust, :visibility, :screenTemperature, :pressure)', row)
+    try:
+      cursor.execute('INSERT INTO met VALUES (:timestamp, :windDirection, :windSpeed, :windGust, :visibility, :screenTemperature, :pressure)', row)
+    except sqlite3.IntegrityError:
+      raise Exception('Data already exists for date {0}'.format(row['timestamp']))
     
     self.db.commit()
   
